@@ -1,0 +1,2395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImageUpscaler - AI图片高清化工具</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 统一的 Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#8B5CF6',
+                        dark: {
+                            100: '#334155',
+                            200: '#1E293B',
+                            300: '#0F172A',
+                        },
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .bg-gradient-blue {
+                background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            }
+            .bg-gradient-purple {
+                background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            }
+            .bg-gradient-green {
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+        }
+    </style>
+    <style>
+        /* 自定义样式 */
+        .image-comparison {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .image-comparison .after-image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            border-right: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .image-comparison .slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 4px;
+            background: white;
+            transform: translateX(-50%);
+            cursor: ew-resize;
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .image-comparison .slider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-comparison .slider::after {
+            content: '⟷';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #3B82F6;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        /* 深色模式样式 */
+        .dark {
+            background-color: #0F172A;
+            color: #F8FAFC;
+        }
+        
+        .dark .bg-white {
+            background-color: #1E293B;
+        }
+        
+        .dark .text-gray-800 {
+            color: #F1F5F9;
+        }
+        
+        .dark .text-gray-600 {
+            color: #CBD5E1;
+        }
+        
+        .dark .text-gray-500 {
+            color: #94A3B8;
+        }
+        
+        .dark .border-gray-300,
+        .dark .border-gray-200 {
+            border-color: #334155;
+        }
+        
+        .dark .bg-gray-200 {
+            background-color: #334155;
+        }
+        
+        .dark .bg-gray-50 {
+            background-color: #0F172A;
+        }
+        
+        .dark .hover\:bg-gray-50:hover {
+            background-color: #334155;
+        }
+        
+        .dark .hover\:bg-gray-100:hover {
+            background-color: #334155;
+        }
+        
+        .dark .shadow-sm {
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+        }
+        
+        .dark .slider {
+            background: #3B82F6;
+        }
+        
+        .dark .after-image-container {
+            border-right-color: rgba(59, 130, 246, 0.5);
+        }
+        
+        /* 图片对比滑块 - 优化版 */
+        .image-comparison-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .before-image-container,
+        .after-image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .after-image-container {
+            width: 50%;
+            border-right: 2px solid white;
+            z-index: 1;
+        }
+        
+        .dark .after-image-container {
+            border-right-color: #3B82F6;
+        }
+        
+        .comparison-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 4px;
+            background: white;
+            transform: translateX(-50%);
+            cursor: ew-resize;
+            z-index: 10;
+            transition: background-color 0.3s ease;
+        }
+        
+        .dark .comparison-slider {
+            background: #3B82F6;
+        }
+        
+        .comparison-slider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            z-index: 11;
+        }
+        
+        .dark .comparison-slider::before {
+            background: rgba(59, 130, 246, 0.9);
+        }
+        
+        .comparison-slider::after {
+            content: '▶';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #3B82F6;
+            font-size: 24px;
+            font-weight: bold;
+            transition: color 0.3s ease, transform 0.3s ease;
+            z-index: 12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .dark .comparison-slider::after {
+            color: white;
+            background: #3B82F6;
+        }
+        
+        .comparison-slider.dragging::before {
+            transform: translate(-50%, -50%) scale(1.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+        }
+        
+        .comparison-slider.dragging::after {
+            transform: translate(-50%, -50%) scale(1.1);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .image-comparison-wrapper.vertical .after-image-container {
+            width: 100%;
+            height: 50%;
+            border-right: none;
+            border-bottom: 2px solid white;
+        }
+        
+        .dark .image-comparison-wrapper.vertical .after-image-container {
+            border-bottom-color: #3B82F6;
+        }
+        
+        .image-comparison-wrapper.vertical .comparison-slider {
+            top: 50%;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 4px;
+            transform: translateY(-50%);
+            cursor: ns-resize;
+        }
+        
+        .image-comparison-wrapper.vertical .comparison-slider::after {
+            content: '⟲';
+        }
+        
+        /* 加载动画 */
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #3B82F6;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        .dark .loading-spinner {
+            border-color: rgba(255, 255, 255, 0.1);
+            border-top-color: #3B82F6;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 4rem;
+            right: 2rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 50;
+            transform: translateX(100%);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        /* 参数变化提示 */
+        .param-indicator {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            background-color: #3B82F6;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 50;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* 图片预览项 */
+        .preview-item {
+            position: relative;
+            width: 100%;
+            height: 80px;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            background-color: #f3f4f6;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .dark .preview-item {
+            background-color: #334155;
+        }
+        
+        .preview-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .preview-item.selected {
+            border: 2px solid #3B82F6;
+        }
+        
+        /* 滑块样式 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e5e7eb;
+            outline: none;
+        }
+        
+        .dark input[type="range"] {
+            background: #334155;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3B82F6;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .dark input[type="range"]::-webkit-slider-thumb {
+            background: #3B82F6;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3B82F6;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: none;
+        }
+        
+        .dark input[type="range"]::-moz-range-thumb {
+            background: #3B82F6;
+        }
+        
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+        
+        /* 模型卡片样式 */
+        .model-card {
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .model-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .model-card.selected {
+            border-color: #3B82F6;
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        
+        .dark .model-card.selected {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        /* 放大倍数按钮样式 */
+        .scale-btn, .denoise-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .scale-btn:hover, .denoise-btn:hover {
+            background-color: #e5e7eb;
+        }
+        
+        .dark .scale-btn:hover, .dark .denoise-btn:hover {
+            background-color: #334155;
+        }
+        
+        .scale-btn.selected, .denoise-btn.selected {
+            background-color: #3B82F6;
+            color: white;
+        }
+        
+        /* 拖放区域样式 */
+        .dropzone {
+            border: 2px dashed #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        
+        .dark .dropzone {
+            border-color: #334155;
+        }
+        
+        .dropzone.active {
+            border-color: #3B82F6;
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        
+        .dark .dropzone.active {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        /* 按钮通用样式 */
+        .btn {
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .preview-item {
+                height: 60px;
+            }
+            
+            .comparison-slider::before {
+                width: 30px;
+                height: 30px;
+            }
+            
+            .comparison-slider::after {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-dark-300 dark:text-gray-100 min-h-screen flex flex-col">
+    <!-- 导航栏 -->
+    <header class="bg-white dark:bg-dark-200 shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="w-10 h-10 rounded-lg bg-gradient-blue flex items-center justify-center">
+                    <i class="fa fa-picture-o text-white text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-white">ImageUpscaler</h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors">
+                    <i class="fa fa-moon-o dark:hidden text-gray-600"></i>
+                    <i class="fa fa-sun-o hidden dark:block text-yellow-400"></i>
+                </button>
+                
+                <a href="#" class="hidden md:flex items-center space-x-1 text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors">
+                    <i class="fa fa-question-circle"></i>
+                    <span>帮助</span>
+                </a>
+                
+                <a href="#" class="hidden md:flex items-center space-x-1 text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors">
+                    <i class="fa fa-user-circle-o"></i>
+                    <span>登录</span>
+                </a>
+                
+                <button class="md:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors">
+                    <i class="fa fa-bars text-gray-600 dark:text-gray-300"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="flex-grow container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧面板 -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- 图片上传区域 -->
+                <div class="bg-white dark:bg-dark-200 rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold mb-4">上传图片</h2>
+                    
+                    <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer">
+                        <i class="fa fa-cloud-upload text-4xl text-gray-400 dark:text-gray-500 mb-3"></i>
+                        <p class="text-gray-600 dark:text-gray-400 mb-2">点击或拖拽图片到此处</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-500 mb-4">支持 JPG、PNG、WebP、BMP 格式</p>
+                        <button id="browse-btn" class="btn bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fa fa-folder-open mr-2"></i>浏览文件
+                        </button>
+                        <input type="file" id="file-input" class="hidden" accept="image/*" multiple>
+                    </div>
+                    
+                    <div id="upload-size-warning" class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 rounded-lg text-sm hidden">
+                        <i class="fa fa-exclamation-triangle mr-2"></i>
+                        <span>上传的文件大小接近限制，请考虑减少文件数量或大小</span>
+                    </div>
+                </div>
+                
+                <!-- 图片预览 -->
+                <div id="image-preview-container" class="bg-white dark:bg-dark-200 rounded-lg shadow-sm p-6 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold">图片预览</h2>
+                        <span id="image-count" class="text-sm text-gray-500 dark:text-gray-400">0/30 张</span>
+                    </div>
+                    
+                    <div id="image-preview-list" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-64 overflow-y-auto p-1">
+                        <!-- 图片预览项将在这里动态添加 -->
+                    </div>
+                </div>
+                
+                <!-- 处理参数 -->
+                <div id="parameters-section" class="bg-white dark:bg-dark-200 rounded-lg shadow-sm p-6 hidden">
+                    <h2 class="text-lg font-semibold mb-4">处理参数</h2>
+                    
+                    <!-- 模型选择 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">选择模型</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="model-card selected rounded-lg p-4 text-center" data-model="general">
+                                <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                    <i class="fa fa-image text-primary text-xl"></i>
+                                </div>
+                                <h3 class="font-medium">通用模型</h3>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">适合大多数图片</p>
+                            </div>
+                            
+                            <div class="model-card rounded-lg p-4 text-center" data-model="anime">
+                                <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                                    <i class="fa fa-paint-brush text-accent text-xl"></i>
+                                </div>
+                                <h3 class="font-medium">动漫模型</h3>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">优化动漫和插画</p>
+                            </div>
+                            
+                            <div class="model-card rounded-lg p-4 text-center" data-model="photo">
+                                <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                    <i class="fa fa-camera text-secondary text-xl"></i>
+                                </div>
+                                <h3 class="font-medium">照片模型</h3>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">优化人物和风景</p>
+                            </div>
+                            
+                            <div class="model-card rounded-lg p-4 text-center" data-model="ultrasharp">
+                                <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                                    <i class="fa fa-star text-yellow-500 text-xl"></i>
+                                </div>
+                                <h3 class="font-medium">超锐化</h3>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">增强细节和边缘</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 放大倍数 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">放大倍数</label>
+                        <div class="flex space-x-2">
+                            <button class="scale-btn flex-1 py-2 px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-center hover:bg-gray-50 dark:hover:bg-dark-100" data-scale="2">2x</button>
+                            <button class="scale-btn flex-1 py-2 px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-center hover:bg-gray-50 dark:hover:bg-dark-100 selected bg-primary text-white" data-scale="4">4x</button>
+                            <button class="scale-btn flex-1 py-2 px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-center hover:bg-gray-50 dark:hover:bg-dark-100" data-scale="8">8x</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 锐度调整 -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">锐度</label>
+                            <span id="sharpness-value" class="text-sm text-gray-500 dark:text-gray-400">50</span>
+                        </div>
+                        <input type="range" id="sharpness-slider" min="0" max="100" value="50" class="w-full">
+                    </div>
+                    
+                    <!-- 降噪程度 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">降噪程度</label>
+                        <div class="flex space-x-2">
+                            <button class="denoise-btn flex-1 py-2 px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-center hover:bg-gray-50 dark:hover:bg-dark-100" data-denoise="10">低</button>
+                            <button class="denoise-btn flex-1 py-2 px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-center hover:bg-gray-50 dark:hover:bg-dark-100 selected bg-primary text-white" data-denoise="30">中</button>
+                            <button class="denoise-btn flex-1 py-2 px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-center hover:bg-gray-50 dark:hover:bg-dark-100" data-denoise="60">高</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 色彩增强 -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">色彩增强</label>
+                            <span id="color-value" class="text-sm text-gray-500 dark:text-gray-400">50</span>
+                        </div>
+                        <input type="range" id="color-slider" min="0" max="100" value="50" class="w-full">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧预览区域 -->
+            <div class="lg:col-span-2">
+                <div class="bg-white dark:bg-dark-200 rounded-lg shadow-sm p-6 h-full flex flex-col">
+                    <!-- 预览控制按钮 -->
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex space-x-2">
+                            <button id="compare-btn" class="btn flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-dark-100">
+                                <i class="fa fa-columns mr-1"></i>
+                                <span>对比视图</span>
+                            </button>
+                            
+                            <div class="relative">
+                                <button id="compare-mode-btn" class="btn flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-dark-100">
+                                    <i class="fa fa-arrows-h mr-1"></i>
+                                    <span>左右对比</span>
+                                </button>
+                                
+                                <div id="compare-mode-menu" class="absolute left-0 mt-1 w-40 bg-white dark:bg-dark-200 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden z-10">
+                                    <div class="compare-mode-option p-2 hover:bg-gray-100 dark:hover:bg-dark-100 cursor-pointer selected" data-mode="horizontal">
+                                        <i class="fa fa-arrows-h mr-2"></i>左右对比
+                                    </div>
+                                    <div class="compare-mode-option p-2 hover:bg-gray-100 dark:hover:bg-dark-100 cursor-pointer" data-mode="vertical">
+                                        <i class="fa fa-arrows-v mr-2"></i>上下对比
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button id="fullscreen-btn" class="btn flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-dark-100">
+                                <i class="fa fa-expand mr-1"></i>
+                                <span>全屏</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 初始状态 -->
+                    <div id="initial-state" class="flex-grow flex flex-col items-center justify-center text-center p-6">
+                        <div class="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+                            <i class="fa fa-picture-o text-primary text-3xl"></i>
+                        </div>
+                        <h2 class="text-xl font-semibold mb-2">开始提升图片质量</h2>
+                        <p class="text-gray-600 dark:text-gray-400 mb-6 max-w-md">上传一张图片，选择合适的模型和参数，然后点击"处理"按钮开始提升图片质量</p>
+                        <button id="process-btn" class="btn bg-primary hover:bg-blue-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fa fa-magic mr-2"></i>处理图片
+                        </button>
+                    </div>
+                    
+                    <!-- 处理中状态 -->
+                    <div id="processing-state" class="flex-grow flex flex-col items-center justify-center text-center p-6 hidden">
+                        <div class="loading-spinner mb-4"></div>
+                        <h2 class="text-xl font-semibold mb-2">正在处理图片</h2>
+                        <p class="text-gray-600 dark:text-gray-400 mb-2">请稍候，我们正在应用 AI 算法提升图片质量...</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-500">处理时间取决于图片大小和所选参数</p>
+                    </div>
+                    
+                    <!-- 结果状态 -->
+                    <div id="result-state" class="flex-grow flex flex-col hidden">
+                        <!-- 普通预览 -->
+                        <div id="normal-preview" class="flex-grow relative bg-gray-100 dark:bg-dark-100 rounded-lg overflow-hidden flex items-center justify-center">
+                            <img id="result-image" class="max-w-full max-h-full object-contain" alt="处理后的图片">
+                        </div>
+                        
+                        <!-- 对比预览 -->
+                        <div id="compare-preview" class="flex-grow relative bg-gray-100 dark:bg-dark-100 rounded-lg overflow-hidden hidden">
+                            <div class="image-comparison-wrapper">
+                                <div class="before-image-container">
+                                    <img id="before-image" class="max-w-full max-h-full object-contain" alt="原始图片">
+                                </div>
+                                <div class="after-image-container">
+                                    <img id="after-image" class="max-w-full max-h-full object-contain" alt="处理后的图片">
+                                </div>
+                                <div class="comparison-slider">
+                                    <!-- 滑块将在这里动态添加 -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="flex justify-between mt-4">
+                            <button id="reset-btn" class="btn flex items-center space-x-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-dark-100">
+                                <i class="fa fa-refresh mr-1"></i>
+                                <span>重新处理</span>
+                            </button>
+                            
+                            <button id="download-btn" class="btn flex items-center space-x-1 px-4 py-2 rounded-lg bg-primary hover:bg-blue-600 text-white">
+                                <i class="fa fa-download mr-1"></i>
+                                <span>下载图片</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white dark:bg-dark-200 border-t border-gray-200 dark:border-dark-100 py-8 mt-8">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div class="md:col-span-2">
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-blue flex items-center justify-center">
+                            <i class="fa fa-picture-o text-white text-xl"></i>
+                        </div>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-white">ImageUpscaler</h2>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        使用先进的 AI 技术提升图片质量，支持多种模型和参数调整，让您的图片更加清晰锐利。
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">
+                            <i class="fa fa-weixin text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">
+                            <i class="fa fa-weibo text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">
+                            <i class="fa fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">
+                            <i class="fa fa-twitter text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-white">快速链接</h3>
+                    <ul class="space-y-2">
+                        <li>
+                            <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">首页</a>
+                        </li>
+                        <li>
+                            <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">功能介绍</a>
+                        </li>
+                        <li>
+                            <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">使用教程</a>
+                        </li>
+                        <li>
+                            <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">API 文档</a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-white">联系我们</h3>
+                    <ul class="space-y-2">
+                        <li class="flex items-center">
+                            <i class="fa fa-envelope-o mr-2 text-gray-500 dark:text-gray-400"></i>
+                            <a href="mailto:support@imageupscaler.com" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors">support@imageupscaler.com</a>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fa fa-phone mr-2 text-gray-500 dark:text-gray-400"></i>
+                            <span class="text-gray-600 dark:text-gray-400">+86 123 4567 8901</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-200 dark:border-dark-100 mt-8 pt-6 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-600 dark:text-gray-400 text-sm">
+                    &copy; 2025 ImageUpscaler. 保留所有权利。
+                </p>
+                <div class="flex space-x-4 mt-4 md:mt-0">
+                    <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary text-sm transition-colors">隐私政策</a>
+                    <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary text-sm transition-colors">服务条款</a>
+                    <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary text-sm transition-colors">Cookie 政策</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // 添加全局错误处理
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('JavaScript错误:', message, '在', source, '行', lineno);
+            return true;
+        };
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM已加载，开始初始化应用...');
+            
+            // 获取DOM元素
+            console.log('开始获取DOM元素...');
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('file-input');
+            const browseBtn = document.getElementById('browse-btn');
+            const imagePreviewContainer = document.getElementById('image-preview-container');
+            const imagePreviewList = document.getElementById('image-preview-list');
+            const imageCount = document.getElementById('image-count');
+            const uploadSizeWarning = document.getElementById('upload-size-warning');
+            const initialState = document.getElementById('initial-state');
+            const processingState = document.getElementById('processing-state');
+            const resultState = document.getElementById('result-state');
+            const normalPreview = document.getElementById('normal-preview');
+            const comparePreview = document.getElementById('compare-preview');
+            const compareBtn = document.getElementById('compare-btn');
+            const fullscreenBtn = document.getElementById('fullscreen-btn');
+            const parametersSection = document.getElementById('parameters-section');
+            const processBtn = document.getElementById('process-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const resultImage = document.getElementById('result-image');
+            const beforeImage = document.getElementById('before-image');
+            const afterImage = document.getElementById('after-image');
+            const modelCards = document.querySelectorAll('.model-card');
+            const scaleBtns = document.querySelectorAll('.scale-btn');
+            const sharpnessSlider = document.getElementById('sharpness-slider');
+            const sharpnessValue = document.getElementById('sharpness-value');
+            const denoiseBtns = document.querySelectorAll('.denoise-btn');
+            const colorSlider = document.getElementById('color-slider');
+            const colorValue = document.getElementById('color-value');
+            const themeToggle = document.getElementById('theme-toggle');
+            const compareModeBtn = document.getElementById('compare-mode-btn');
+            const compareModeMenu = document.getElementById('compare-mode-menu');
+            const compareModeOptions = document.querySelectorAll('.compare-mode-option');
+            
+            // 检查DOM元素是否成功获取
+            const requiredElements = {
+                dropzone, fileInput, browseBtn, imagePreviewContainer, imagePreviewList,
+                imageCount, initialState, processingState, resultState, normalPreview,
+                comparePreview, compareBtn, processBtn, downloadBtn, resetBtn,
+                resultImage, beforeImage, afterImage
+            };
+            
+            for (const [name, element] of Object.entries(requiredElements)) {
+                if (!element) {
+                    console.error(`未找到必需的DOM元素: ${name}`);
+                }
+            }
+            
+            console.log('DOM元素获取完成');
+            
+            // 存储当前选中的图片和参数
+            let selectedImages = [];
+            let currentImage = null;
+            let currentModel = 'general';
+            let currentScale = 4;
+            let currentSharpness = 50;
+            let currentDenoise = 30;
+            let currentColor = 50;
+            
+            // 上传限制
+            const MAX_FILES = 30;
+            const MAX_TOTAL_SIZE = 1024 * 1024 * 1024; // 1024MB
+            const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB
+            let totalSize = 0;
+            
+            // 示例图片URL（用于模拟处理结果）
+            const exampleImageUrl = 'https://p3-doubao-search-sign.byteimg.com/labis/image/81f051daf675133da7dc5a43c492aaa6~tplv-be4g95zd3a-image.jpeg?rk3s=542c0f93&x-expires=1779721886&x-signature=IvQy913AYPlp4Ul1q%2FW%2FB9MoCTY%3D';
+            const exampleProcessedUrl = 'https://p26-doubao-search-sign.byteimg.com/ecom-shop-material/OArwAdqt_m_0fc500f8b233c3930a7e8cb5951af58b_sx_208683_www800-800~tplv-be4g95zd3a-image.jpeg?rk3s=542c0f93&x-expires=1779721886&x-signature=G9HECButgmHOxenSlp6eBkTSj1A%3D';
+            
+            // 初始化图片对比滑块（延迟初始化，确保DOM完全加载）
+            setTimeout(() => {
+                initImageComparison();
+            }, 100);
+            
+            // 事件监听器：浏览按钮点击
+            browseBtn.addEventListener('click', function() {
+                console.log('浏览按钮点击');
+                fileInput.click();
+            });
+            
+            // 事件监听器：文件选择
+            fileInput.addEventListener('change', function(e) {
+                console.log('文件选择变化');
+                const files = e.target.files;
+                if (!files.length) return;
+                
+                handleFileSelection(files);
+            });
+            
+            // 事件监听器：拖放区域
+            dropzone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('active');
+            });
+            
+            dropzone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // 只有当鼠标真正离开dropzone时才移除active类
+                if (!this.contains(e.relatedTarget)) {
+                    dropzone.classList.remove('active');
+                }
+            });
+            
+            dropzone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('active');
+                
+                const files = e.dataTransfer.files;
+                if (!files.length) return;
+                
+                handleFileSelection(files);
+            });
+            
+            // 处理文件选择
+            function handleFileSelection(files) {
+                console.log('处理文件选择', files.length, '个文件');
+                
+                // 检查文件数量限制
+                if (selectedImages.length + files.length > MAX_FILES) {
+                    showNotification(`最多只能上传 ${MAX_FILES} 张图片，请减少选择的文件数量`, 'error');
+                    return;
+                }
+                
+                // 验证文件类型、大小和总大小
+                const validFiles = [];
+                const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'];
+                let newTotalSize = totalSize;
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    
+                    if (!validTypes.includes(file.type)) {
+                        showNotification(`文件 ${file.name} 不是有效的图片格式`, 'error');
+                        continue;
+                    }
+                    
+                    if (file.size > MAX_FILE_SIZE) {
+                        showNotification(`文件 ${file.name} 超过了40MB的大小限制`, 'error');
+                        continue;
+                    }
+                    
+                    if (newTotalSize + file.size > MAX_TOTAL_SIZE) {
+                        showNotification(`添加 ${file.name} 后将超过总大小限制 (1024MB)`, 'error');
+                        continue;
+                    }
+                    
+                    validFiles.push(file);
+                    newTotalSize += file.size;
+                }
+                
+                if (validFiles.length > 0) {
+                    console.log('验证通过', validFiles.length, '个文件');
+                    
+                    // 更新总大小
+                    totalSize = newTotalSize;
+                    
+                    // 检查是否接近大小限制
+                    if (totalSize > MAX_TOTAL_SIZE * 0.9) {
+                        uploadSizeWarning.classList.remove('hidden');
+                    } else {
+                        uploadSizeWarning.classList.add('hidden');
+                    }
+                    
+                    handleFiles(validFiles);
+                }
+            }
+            
+            // 处理文件
+            function handleFiles(files) {
+                console.log('处理文件', files.length, '个文件');
+                
+                // 显示预览容器
+                imagePreviewContainer.classList.remove('hidden');
+                
+                // 更新图片计数
+                updateImageCount();
+                
+                // 添加新文件到选中列表
+                selectedImages = [...selectedImages, ...files];
+                
+                // 处理每个文件
+                files.forEach((file, index) => {
+                    const globalIndex = selectedImages.length - files.length + index;
+                    
+                    // 创建加载中的预览项
+                    const loadingItem = document.createElement('div');
+                    loadingItem.id = `loading-${globalIndex}`;
+                    loadingItem.className = 'preview-item flex items-center justify-center bg-gray-100 dark:bg-dark-100';
+                    loadingItem.innerHTML = `
+                        <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    `;
+                    imagePreviewList.appendChild(loadingItem);
+                    
+                    // 读取文件
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // 移除加载状态
+                        const loadingItem = document.getElementById(`loading-${globalIndex}`);
+                        if (loadingItem) {
+                            loadingItem.remove();
+                        }
+                        
+                        // 创建预览项
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'preview-item relative';
+                        
+                        // 设置背景图片
+                        previewItem.style.backgroundImage = `url(${e.target.result})`;
+                        previewItem.style.backgroundSize = 'cover';
+                        previewItem.style.backgroundPosition = 'center';
+                        
+                        // 添加文件名
+                        const fileName = document.createElement('div');
+                        fileName.className = 'absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 truncate';
+                        fileName.textContent = file.name;
+                        previewItem.appendChild(fileName);
+                        
+                        // 添加删除按钮
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'absolute top-1 right-1 w-5 h-5 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors';
+                        deleteBtn.innerHTML = '<i class="fa fa-times text-xs"></i>';
+                        deleteBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            
+                            // 从选中列表中移除
+                            selectedImages.splice(selectedImages.indexOf(file), 1);
+                            
+                            // 更新总大小
+                            totalSize -= file.size;
+                            
+                            // 更新图片计数
+                            updateImageCount();
+                            
+                            // 移除预览项
+                            previewItem.remove();
+                            
+                            // 如果没有图片了，隐藏预览容器
+                            if (selectedImages.length === 0) {
+                                imagePreviewContainer.classList.add('hidden');
+                                uploadSizeWarning.classList.add('hidden');
+                                
+                                // 重置界面
+                                resetInterface();
+                            }
+                            
+                            showNotification(`已删除图片: ${file.name}`, 'info');
+                        });
+                        
+                        previewItem.appendChild(deleteBtn);
+                        
+                        // 添加点击事件
+                        previewItem.addEventListener('click', function() {
+                            // 移除其他选中项的选中状态
+                            document.querySelectorAll('.preview-item').forEach(item => {
+                                item.classList.remove('selected');
+                            });
+                            
+                            // 添加选中状态
+                            this.classList.add('selected');
+                            
+                            // 设置当前图片
+                            currentImage = file;
+                            
+                            // 显示参数面板
+                            parametersSection.classList.remove('hidden');
+                            
+                            // 启用处理按钮
+                            processBtn.disabled = false;
+                            
+                            // 显示第一张图片的预览
+                            const imgUrl = URL.createObjectURL(file);
+                            beforeImage.src = imgUrl;
+                            afterImage.src = imgUrl;
+                            resultImage.src = imgUrl;
+                            
+                            // 显示结果状态
+                            initialState.classList.add('hidden');
+                            processingState.classList.add('hidden');
+                            resultState.classList.remove('hidden');
+                            parametersSection.classList.remove('hidden');
+                        });
+                        
+                        imagePreviewList.appendChild(previewItem);
+                    };
+                    
+                    reader.onerror = function() {
+                        // 移除加载状态
+                        const loadingItem = document.getElementById(`loading-${globalIndex}`);
+                        if (loadingItem) {
+                            loadingItem.remove();
+                        }
+                        
+                        // 显示错误
+                        const errorItem = document.createElement('div');
+                        errorItem.className = 'relative flex items-center justify-center bg-red-50 dark:bg-red-900/20 rounded-lg h-20 p-2';
+                        errorItem.innerHTML = `
+                            <i class="fa fa-exclamation-triangle text-red-500 mr-2"></i>
+                            <span class="text-xs text-red-500 dark:text-red-400">无法加载: ${file.name}</span>
+                        `;
+                        imagePreviewList.appendChild(errorItem);
+                        
+                        // 从选中列表中移除
+                        selectedImages.splice(selectedImages.indexOf(file), 1);
+                        
+                        // 更新图片计数
+                        updateImageCount();
+                        
+                        showNotification(`无法加载图片: ${file.name}`, 'error');
+                    };
+                    
+                    // 读取文件
+                    reader.readAsDataURL(file);
+                });
+                
+                // 显示第一张图片的预览
+                if (selectedImages.length > 0 && !currentImage) {
+                    currentImage = selectedImages[0];
+                    
+                    const imgUrl = URL.createObjectURL(currentImage);
+                    beforeImage.src = imgUrl;
+                    afterImage.src = imgUrl;
+                    resultImage.src = imgUrl;
+                    
+                    // 显示结果状态
+                    initialState.classList.add('hidden');
+                    processingState.classList.add('hidden');
+                    resultState.classList.remove('hidden');
+                    parametersSection.classList.remove('hidden');
+                    
+                    // 启用处理按钮
+                    processBtn.disabled = false;
+                    
+                    // 选中第一张图片
+                    setTimeout(() => {
+                        const firstPreviewItem = imagePreviewList.querySelector('.preview-item');
+                        if (firstPreviewItem) {
+                            firstPreviewItem.classList.add('selected');
+                        }
+                    }, 100);
+                    
+                    showNotification(`已成功加载 ${files.length} 张图片`, 'success');
+                }
+            }
+            
+            // 更新图片计数
+            function updateImageCount() {
+                imageCount.textContent = `${selectedImages.length}/${MAX_FILES} 张`;
+                
+                // 如果接近最大数量，改变颜色提醒
+                if (selectedImages.length >= MAX_FILES * 0.9) {
+                    imageCount.classList.add('text-yellow-500');
+                } else {
+                    imageCount.classList.remove('text-yellow-500');
+                }
+            }
+            
+            // 事件监听器：模型选择
+            modelCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    console.log('模型选择:', this.dataset.model);
+                    modelCards.forEach(c => c.classList.remove('selected'));
+                    this.classList.add('selected');
+                    currentModel = this.dataset.model;
+                    
+                    // 如果已经有处理结果，重新处理
+                    if (currentImage) {
+                        processImage();
+                    }
+                });
+            });
+            
+            // 事件监听器：放大倍数选择
+            scaleBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    console.log('放大倍数选择:', this.dataset.scale);
+                    scaleBtns.forEach(b => {
+                        b.classList.remove('selected', 'bg-primary', 'text-white');
+                    });
+                    this.classList.add('selected', 'bg-primary', 'text-white');
+                    currentScale = parseInt(this.dataset.scale);
+                    
+                    // 如果已经有处理结果，重新处理
+                    if (currentImage) {
+                        processImage();
+                    }
+                });
+            });
+            
+            // 统一的参数调整防抖处理
+            let processingTimeout;
+            
+            // 事件监听器：锐度滑块
+            sharpnessSlider.addEventListener('input', function() {
+                currentSharpness = parseInt(this.value);
+                sharpnessValue.textContent = currentSharpness;
+                
+                // 显示实时参数值变化
+                showParameterChange('锐度', currentSharpness);
+                
+                // 统一防抖处理
+                handleParameterChange();
+            });
+            
+            // 事件监听器：降噪按钮
+            denoiseBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    console.log('降噪程度选择:', this.dataset.denoise);
+                    denoiseBtns.forEach(b => {
+                        b.classList.remove('selected', 'bg-primary', 'text-white');
+                    });
+                    this.classList.add('selected', 'bg-primary', 'text-white');
+                    currentDenoise = parseInt(this.dataset.denoise);
+                    
+                    // 显示参数变化
+                    showParameterChange('降噪程度', currentDenoise);
+                    
+                    // 如果已经有处理结果，重新处理
+                    if (currentImage) {
+                        processImage();
+                    }
+                });
+            });
+            
+            // 事件监听器：色彩增强滑块
+            colorSlider.addEventListener('input', function() {
+                currentColor = parseInt(this.value);
+                colorValue.textContent = currentColor;
+                
+                // 显示实时参数值变化
+                showParameterChange('色彩增强', currentColor);
+                
+                // 统一防抖处理
+                handleParameterChange();
+            });
+            
+            // 统一处理参数变化 - 增强版，确保视图稳定性
+            function handleParameterChange() {
+                console.log('参数变化处理');
+                
+                // 清除之前的定时器
+                clearTimeout(processingTimeout);
+                
+                if (currentImage) {
+                    processingTimeout = setTimeout(() => {
+                        // 保存当前视图状态
+                        const isNormalViewVisible = !normalPreview.classList.contains('hidden');
+                        const isCompareViewVisible = !comparePreview.classList.contains('hidden');
+                        
+                        // 保存当前处理结果，用于恢复
+                        const currentResultSrc = resultImage.src;
+                        const currentAfterSrc = afterImage ? afterImage.src : '';
+                        
+                        // 确保在处理前显示处理中状态
+                        if (initialState) initialState.classList.add('hidden');
+                        if (resultState) resultState.classList.add('hidden');
+                        if (processingState) processingState.classList.remove('hidden');
+                        if (parametersSection) parametersSection.classList.add('hidden');
+                        
+                        // 处理图片
+                        processImage().then(() => {
+                            // 处理成功后，确保视图状态正确
+                            if (isNormalViewVisible) {
+                                normalPreview.classList.remove('hidden');
+                                comparePreview.classList.add('hidden');
+                            } else if (isCompareViewVisible) {
+                                normalPreview.classList.add('hidden');
+                                comparePreview.classList.remove('hidden');
+                                // 重新初始化对比滑块
+                                initImageComparison();
+                            }
+                        }).catch(error => {
+                            console.error('图像处理失败:', error);
+                            
+                            // 恢复到处理前的状态
+                            if (currentResultSrc) {
+                                resultImage.src = currentResultSrc;
+                            }
+                            if (afterImage && currentAfterSrc) {
+                                afterImage.src = currentAfterSrc;
+                            }
+                            
+                            // 恢复视图状态
+                            if (isNormalViewVisible) {
+                                normalPreview.classList.remove('hidden');
+                                comparePreview.classList.add('hidden');
+                            } else if (isCompareViewVisible) {
+                                normalPreview.classList.add('hidden');
+                                comparePreview.classList.remove('hidden');
+                            }
+                            
+                            // 显示结果状态
+                            if (processingState) processingState.classList.add('hidden');
+                            if (resultState) resultState.classList.remove('hidden');
+                            if (parametersSection) parametersSection.classList.remove('hidden');
+                            
+                            showNotification('参数调整失败，请重试', 'error');
+                        });
+                    }, 300);
+                }
+            }
+            
+            // 显示参数变化的临时提示
+            function showParameterChange(paramName, value) {
+                // 创建参数变化提示元素
+                let paramIndicator = document.getElementById('param-indicator');
+                
+                if (!paramIndicator) {
+                    paramIndicator = document.createElement('div');
+                    paramIndicator.id = 'param-indicator';
+                    paramIndicator.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300 opacity-0';
+                    document.body.appendChild(paramIndicator);
+                }
+                
+                // 更新提示内容
+                paramIndicator.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa fa-sliders mr-2"></i>
+                        <span>${paramName}: ${value}</span>
+                    </div>
+                `;
+                
+                // 显示提示
+                paramIndicator.classList.remove('opacity-0');
+                
+                // 清除之前的定时器
+                if (window.paramIndicatorTimeout) {
+                    clearTimeout(window.paramIndicatorTimeout);
+                }
+                
+                // 设置自动隐藏
+                window.paramIndicatorTimeout = setTimeout(() => {
+                    paramIndicator.classList.add('opacity-0');
+                    
+                    // 移除元素
+                    setTimeout(() => {
+                        if (paramIndicator.parentNode) {
+                            paramIndicator.parentNode.removeChild(paramIndicator);
+                        }
+                    }, 300);
+                }, 1000);
+            }
+            
+            // 事件监听器：对比按钮
+            compareBtn.addEventListener('click', function() {
+                console.log('对比按钮点击');
+                
+                if (normalPreview.classList.contains('hidden')) {
+                    // 切换到普通视图
+                    normalPreview.classList.remove('hidden');
+                    comparePreview.classList.add('hidden');
+                    this.innerHTML = '<i class="fa fa-columns mr-1"></i> 对比视图';
+                } else {
+                    // 切换到对比视图
+                    normalPreview.classList.add('hidden');
+                    comparePreview.classList.remove('hidden');
+                    this.innerHTML = '<i class="fa fa-image mr-1"></i> 普通视图';
+                    
+                    // 确保对比滑块初始化
+                    initImageComparison();
+                    
+                    // 确保处理后的图片在对比视图中正确显示
+                    if (resultImage.src && resultImage.src !== '') {
+                        // 同步普通视图和对比视图的图片
+                        if (afterImage && afterImage.src !== resultImage.src) {
+                            afterImage.src = resultImage.src;
+                        }
+                        
+                        // 确保原图也正确显示
+                        if (beforeImage && currentImage) {
+                            const originalImageUrl = URL.createObjectURL(currentImage);
+                            if (beforeImage.src !== originalImageUrl) {
+                                beforeImage.src = originalImageUrl;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 对比模式切换按钮
+            // 显示/隐藏对比模式菜单
+            compareModeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                compareModeMenu.classList.toggle('hidden');
+            });
+            
+            // 点击其他地方关闭菜单
+            document.addEventListener('click', function() {
+                compareModeMenu.classList.add('hidden');
+            });
+            
+            // 阻止菜单内点击事件冒泡
+            compareModeMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // 对比模式选项点击事件
+            compareModeOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const mode = this.dataset.mode;
+                    const container = document.querySelector('.image-comparison-wrapper');
+                    const slider = document.querySelector('.comparison-slider');
+                    
+                    // 更新选中状态
+                    compareModeOptions.forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    
+                    // 更新按钮文本和图标
+                    if (mode === 'vertical') {
+                        compareModeBtn.innerHTML = '<i class="fa fa-arrows-v mr-1"></i> 上下对比';
+                        container.classList.add('vertical');
+                        
+                        // 更新滑块样式为垂直模式
+                        if (slider) {
+                            slider.style.setProperty('--slider-icon', '⟲');
+                        }
+                    } else {
+                        compareModeBtn.innerHTML = '<i class="fa fa-arrows-h mr-1"></i> 左右对比';
+                        container.classList.remove('vertical');
+                        
+                        // 更新滑块样式为水平模式
+                        if (slider) {
+                            slider.style.setProperty('--slider-icon', '▶');
+                        }
+                    }
+                    
+                    // 重新初始化对比滑块
+                    initImageComparison();
+                    
+                    // 关闭菜单
+                    compareModeMenu.classList.add('hidden');
+                });
+            });
+            
+            // 事件监听器：全屏按钮
+            fullscreenBtn.addEventListener('click', function() {
+                console.log('全屏按钮点击');
+                const previewContainer = document.querySelector('.lg\\:col-span-2 .bg-white');
+                
+                // 检查浏览器是否支持全屏API
+                if (!document.fullscreenEnabled) {
+                    showNotification('您的浏览器不支持全屏功能', 'info');
+                    return;
+                }
+                
+                if (!document.fullscreenElement) {
+                    // 尝试使用不同浏览器的全屏API
+                    if (previewContainer.requestFullscreen) {
+                        previewContainer.requestFullscreen();
+                    } else if (previewContainer.mozRequestFullScreen) { /* Firefox */
+                        previewContainer.mozRequestFullScreen();
+                    } else if (previewContainer.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                        previewContainer.webkitRequestFullscreen();
+                    } else if (previewContainer.msRequestFullscreen) { /* IE/Edge */
+                        previewContainer.msRequestFullscreen();
+                    }
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                }
+            });
+            
+            // 监听全屏变化事件，更新按钮图标
+            document.addEventListener('fullscreenchange', updateFullscreenButton);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+            document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+            document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+            
+            function updateFullscreenButton() {
+                if (document.fullscreenElement) {
+                    fullscreenBtn.innerHTML = '<i class="fa fa-compress mr-1"></i> 退出全屏';
+                } else {
+                    fullscreenBtn.innerHTML = '<i class="fa fa-expand mr-1"></i> 全屏';
+                }
+            }
+            
+            // 事件监听器：处理按钮
+            processBtn.addEventListener('click', function() {
+                console.log('处理按钮点击');
+                if (currentImage) {
+                    processImage();
+                }
+            });
+            
+            // 事件监听器：下载按钮
+            downloadBtn.addEventListener('click', function() {
+                console.log('下载按钮点击');
+                if (resultImage.src) {
+                    downloadImage(resultImage.src, 'upscaled-image');
+                }
+            });
+            
+            // 事件监听器：重置按钮
+            resetBtn.addEventListener('click', function() {
+                console.log('重置按钮点击');
+                // 重置参数到默认值
+                currentScale = 4;
+                currentSharpness = 50;
+                currentDenoise = 30;
+                currentColor = 50;
+                
+                // 更新UI
+                scaleBtns.forEach(btn => {
+                    if (parseInt(btn.dataset.scale) === 4) {
+                        btn.classList.add('selected', 'bg-primary', 'text-white');
+                    } else {
+                        btn.classList.remove('selected', 'bg-primary', 'text-white');
+                    }
+                });
+                
+                sharpnessSlider.value = 50;
+                sharpnessValue.textContent = 50;
+                
+                denoiseSlider.value = 30;
+                denoiseValue.textContent = 30;
+                
+                colorSlider.value = 50;
+                colorValue.textContent = 50;
+                
+                // 重新处理图片
+                processImage();
+            });
+            
+            // 事件监听器：主题切换
+            themeToggle.addEventListener('click', function() {
+                console.log('主题切换');
+                document.documentElement.classList.toggle('dark');
+                
+                // 保存主题偏好
+                const isDarkMode = document.documentElement.classList.contains('dark');
+                localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+            });
+            
+            // 检查主题偏好
+            if (localStorage.getItem('theme') === 'dark' || 
+                (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            
+            // 处理图片（基于Canvas的图像处理）- 完全修复版
+            function processImage() {
+                console.log('开始处理图片...', {
+                    currentImage: !!currentImage,
+                    currentModel,
+                    currentScale,
+                    currentSharpness,
+                    currentDenoise,
+                    currentColor
+                });
+                
+                return new Promise((resolve, reject) => {
+                    try {
+                        // 安全检查
+                        if (!currentImage) {
+                            console.error('没有选中的图片');
+                            showNotification('请先选择一张图片', 'error');
+                            reject(new Error('没有选中的图片'));
+                            return;
+                        }
+                        
+                        // 显示处理中状态
+                        if (initialState) initialState.classList.add('hidden');
+                        if (resultState) resultState.classList.add('hidden');
+                        if (processingState) processingState.classList.remove('hidden');
+                        if (parametersSection) parametersSection.classList.add('hidden');
+                        
+                        // 显示当前正在应用的参数
+                        showNotification(`正在应用 ${currentModel} 模型，放大 ${currentScale} 倍...`, 'info');
+                        
+                        // 获取当前图片的URL
+                        const originalImageUrl = URL.createObjectURL(currentImage);
+                        
+                        // 创建图像对象
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous'; // 允许跨域图像处理
+                        
+                        img.onload = function() {
+                            try {
+                                console.log('图像加载成功，开始处理');
+                                
+                                // 创建Canvas元素
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                
+                                // 计算目标尺寸（根据放大倍数）
+                                const targetWidth = img.width * currentScale;
+                                const targetHeight = img.height * currentScale;
+                                
+                                // 安全检查：限制最大尺寸，避免内存问题
+                                const maxDimension = 8000;
+                                const safeWidth = Math.min(targetWidth, maxDimension);
+                                const safeHeight = Math.min(targetHeight, maxDimension);
+                                
+                                console.log(`目标尺寸: ${targetWidth}x${targetHeight}, 安全尺寸: ${safeWidth}x${safeHeight}`);
+                                
+                                // 设置Canvas尺寸
+                                canvas.width = safeWidth;
+                                canvas.height = safeHeight;
+                                
+                                // 先绘制原始图像（缩小或放大到目标尺寸）
+                                ctx.imageSmoothingEnabled = true;
+                                ctx.imageSmoothingQuality = 'high';
+                                ctx.drawImage(img, 0, 0, safeWidth, safeHeight);
+                                
+                                // 应用锐度调整
+                                applySharpness(ctx, canvas.width, canvas.height, currentSharpness);
+                                
+                                // 应用降噪处理
+                                applyDenoise(ctx, canvas.width, canvas.height, currentDenoise);
+                                
+                                // 应用色彩增强
+                                applyColorEnhancement(ctx, canvas.width, canvas.height, currentColor);
+                                
+                                // 根据选择的模型应用特定效果
+                                applyModelEffect(ctx, canvas.width, canvas.height, currentModel);
+                                
+                                // 获取处理后的图像数据URL
+                                const processedUrl = canvas.toDataURL('image/png');
+                                
+                                console.log('图像处理完成，更新UI');
+                                
+                                // 更新结果图片
+                                if (resultImage) {
+                                    resultImage.src = processedUrl;
+                                }
+                                
+                                // 确保对比视图中的处理后图片也更新
+                                if (afterImage) {
+                                    afterImage.src = processedUrl;
+                                }
+                                
+                                // 如果当前正在显示对比视图，确保初始化对比滑块
+                                if (comparePreview && !comparePreview.classList.contains('hidden')) {
+                                    initImageComparison();
+                                }
+                                
+                                // 显示结果状态
+                                if (processingState) processingState.classList.add('hidden');
+                                if (resultState) resultState.classList.remove('hidden');
+                                if (parametersSection) parametersSection.classList.remove('hidden');
+                                
+                                // 显示处理完成通知
+                                showNotification(`图片处理完成！已应用 ${currentModel} 模型和自定义参数`, 'success');
+                                
+                                resolve();
+                            } catch (error) {
+                                console.error('图像处理过程中出错:', error);
+                                // 恢复UI状态
+                                if (processingState) processingState.classList.add('hidden');
+                                if (resultState) resultState.classList.remove('hidden');
+                                if (parametersSection) parametersSection.classList.remove('hidden');
+                                showNotification('图像处理过程中出错，请重试', 'error');
+                                reject(error);
+                            }
+                        };
+                        
+                        img.onerror = function() {
+                            console.error('图像加载失败');
+                            // 处理图像加载错误
+                            if (processingState) processingState.classList.add('hidden');
+                            if (resultState) resultState.classList.remove('hidden');
+                            if (parametersSection) parametersSection.classList.remove('hidden');
+                            showNotification('图像加载失败，请尝试重新上传图片', 'error');
+                            reject(new Error('图像加载失败'));
+                        };
+                        
+                        // 加载图像
+                        img.src = originalImageUrl;
+                    } catch (error) {
+                        console.error('处理图片时出错:', error);
+                        // 恢复UI状态
+                        if (processingState) processingState.classList.add('hidden');
+                        if (resultState) resultState.classList.remove('hidden');
+                        if (parametersSection) parametersSection.classList.remove('hidden');
+                        showNotification('处理图片时出错，请重试', 'error');
+                        reject(error);
+                    }
+                });
+            }
+            
+            // 应用锐度调整
+            function applySharpness(ctx, width, height, sharpness) {
+                try {
+                    // 将锐度值从0-100映射到0-2
+                    const factor = sharpness / 50;
+                    
+                    if (factor === 1) return; // 默认锐度，无需处理
+                    
+                    // 获取图像数据
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    
+                    // 创建临时画布用于锐度处理
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = width;
+                    tempCanvas.height = height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    
+                    // 复制原始图像到临时画布
+                    tempCtx.putImageData(imageData, 0, 0);
+                    
+                    // 锐度处理（使用卷积矩阵）
+                    const kernel = [
+                        0, -factor, 0,
+                        -factor, 4 * factor + 1, -factor,
+                        0, -factor, 0
+                    ];
+                    
+                    applyConvolution(tempCtx, ctx, width, height, kernel);
+                } catch (error) {
+                    console.error('锐度处理出错:', error);
+                    // 如果锐度处理失败，不影响其他处理步骤
+                }
+            }
+            
+            // 应用降噪处理（完全重写版，确保稳定性）
+            function applyDenoise(ctx, width, height, denoise) {
+                try {
+                    // 将降噪值从0-100映射到0-1
+                    const factor = denoise / 100;
+                    
+                    // 当降噪值很小时（小于5），直接跳过处理，避免微小值导致的异常
+                    if (factor < 0.05) return; // 降噪值太小，无需处理
+                    
+                    // 限制最大降噪强度，避免过度模糊
+                    const maxBlurRadius = 3; // 最大模糊半径
+                    const blurRadius = Math.min(factor * 5, maxBlurRadius);
+                    
+                    // 安全检查：确保blurRadius有效
+                    if (blurRadius <= 0 || isNaN(blurRadius)) {
+                        console.warn('无效的模糊半径:', blurRadius);
+                        return;
+                    }
+                    
+                    // 创建临时画布用于降噪处理
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = width;
+                    tempCanvas.height = height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    
+                    // 先将当前画布内容复制到临时画布
+                    tempCtx.drawImage(ctx.canvas, 0, 0);
+                    
+                    // 应用高斯模糊进行降噪
+                    applyGaussianBlur(tempCtx, ctx, width, height, blurRadius);
+                } catch (error) {
+                    console.error('降噪处理出错:', error);
+                    // 如果降噪处理失败，不影响其他处理步骤
+                }
+            }
+            
+            // 应用色彩增强（优化版 - 更接近原图色彩，添加错误处理）
+            function applyColorEnhancement(ctx, width, height, color) {
+                try {
+                    // 将色彩增强值从0-100映射到0.9-1.2（更保守的范围，减少色彩偏差）
+                    const factor = 0.9 + (color / 100) * 0.3;
+                    
+                    if (factor === 1) return; // 默认色彩，无需处理
+                    
+                    // 获取图像数据
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    
+                    // 计算图像的平均亮度和色彩分布
+                    let totalR = 0, totalG = 0, totalB = 0;
+                    let pixelCount = 0;
+                    
+                    // 采样计算平均值（每隔几个像素采样一次，提高性能）
+                    const sampleRate = Math.max(1, Math.floor(Math.sqrt(width * height) / 100));
+                    for (let i = 0; i < data.length; i += 4 * sampleRate) {
+                        totalR += data[i];
+                        totalG += data[i + 1];
+                        totalB += data[i + 2];
+                        pixelCount++;
+                    }
+                    
+                    // 防止除零错误
+                    if (pixelCount === 0) {
+                        console.warn('色彩增强：像素采样失败');
+                        return;
+                    }
+                    
+                    const avgR = totalR / pixelCount;
+                    const avgG = totalG / pixelCount;
+                    const avgB = totalB / pixelCount;
+                    
+                    // 计算平均亮度
+                    const avgLuminance = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114) / 255;
+                    
+                    // 应用更保守的色彩增强，保持与原图色彩一致性
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        
+                        // 计算当前像素的亮度
+                        const luminance = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+                        
+                        // 使用更保守的增强因子，减少色彩偏差
+                        let localFactor;
+                        if (factor > 1) {
+                            // 增强模式 - 更保守
+                            const luminanceFactor = 1 - Math.abs(luminance - 0.5) * 1.5; // 降低亮度因子的影响
+                            localFactor = 1 + (factor - 1) * luminanceFactor * 0.6; // 减少增强幅度
+                        } else {
+                            // 减弱模式
+                            localFactor = factor;
+                        }
+                        
+                        // 计算每个通道的调整因子，更严格地保持原始色彩平衡
+                        const rFactor = localFactor * (1 + (avgR / 255 - 0.5) * 0.1); // 减少色彩偏移
+                        const gFactor = localFactor * (1 + (avgG / 255 - 0.5) * 0.1);
+                        const bFactor = localFactor * (1 + (avgB / 255 - 0.5) * 0.1);
+                        
+                        // 应用调整，保持相对色彩平衡
+                        data[i] = Math.min(255, Math.max(0, Math.round(r * rFactor)));
+                        data[i + 1] = Math.min(255, Math.max(0, Math.round(g * gFactor)));
+                        data[i + 2] = Math.min(255, Math.max(0, Math.round(b * bFactor)));
+                        
+                        // 非常轻微地调整对比度，避免过度增强
+                        const contrastFactor = 1 + (factor - 1) * 0.15; // 减少对比度调整
+                        data[i] = Math.min(255, Math.max(0, Math.round(128 + (data[i] - 128) * contrastFactor)));
+                        data[i + 1] = Math.min(255, Math.max(0, Math.round(128 + (data[i + 1] - 128) * contrastFactor)));
+                        data[i + 2] = Math.min(255, Math.max(0, Math.round(128 + (data[i + 2] - 128) * contrastFactor)));
+                    }
+                    
+                    // 将处理后的数据放回画布
+                    ctx.putImageData(imageData, 0, 0);
+                } catch (error) {
+                    console.error('色彩增强处理出错:', error);
+                    // 如果色彩增强处理失败，不影响其他处理步骤
+                }
+            }
+            
+            // 根据选择的模型应用特定效果
+            function applyModelEffect(ctx, width, height, model) {
+                try {
+                    // 获取图像数据
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    
+                    switch (model) {
+                        case 'anime':
+                            // 动漫风格：增强线条和色彩对比度
+                            for (let i = 0; i < data.length; i += 4) {
+                                // 增强对比度
+                                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                                const factor = avg < 128 ? 0.8 : 1.2;
+                                
+                                data[i] = Math.min(255, data[i] * factor);
+                                data[i + 1] = Math.min(255, data[i + 1] * factor);
+                                data[i + 2] = Math.min(255, data[i + 2] * factor);
+                            }
+                            break;
+                            
+                        case 'photo':
+                            // 照片风格：增强细节和自然色彩
+                            for (let i = 0; i < data.length; i += 4) {
+                                // 轻微增强红色和蓝色通道，使肤色更自然
+                                data[i] = Math.min(255, data[i] * 1.05);
+                                data[i + 2] = Math.min(255, data[i + 2] * 1.05);
+                            }
+                            break;
+                            
+                        case 'ultrasharp':
+                            // 超锐化风格：极强的锐度和边缘增强
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = width;
+                            tempCanvas.height = height;
+                            const tempCtx = tempCanvas.getContext('2d');
+                            
+                            // 复制当前图像到临时画布
+                            tempCtx.putImageData(imageData, 0, 0);
+                            
+                            // 应用强烈锐化
+                            const kernel = [
+                                0, -2, 0,
+                                -2, 9, -2,
+                                0, -2, 0
+                            ];
+                            
+                            applyConvolution(tempCtx, ctx, width, height, kernel);
+                            return; // 提前返回，因为已经应用了卷积
+                            
+                        default:
+                            // 通用模型：轻微增强对比度
+                            for (let i = 0; i < data.length; i += 4) {
+                                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                                const factor = avg < 128 ? 0.9 : 1.1;
+                                
+                                data[i] = Math.min(255, data[i] * factor);
+                                data[i + 1] = Math.min(255, data[i + 1] * factor);
+                                data[i + 2] = Math.min(255, data[i + 2] * factor);
+                            }
+                    }
+                    
+                    // 将处理后的数据放回画布
+                    ctx.putImageData(imageData, 0, 0);
+                } catch (error) {
+                    console.error('模型效果应用出错:', error);
+                    // 如果模型效果应用失败，不影响其他处理步骤
+                }
+            }
+            
+            // 应用卷积操作（用于锐化等效果）
+            function applyConvolution(srcCtx, destCtx, width, height, kernel) {
+                try {
+                    const imageData = srcCtx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    const result = new Uint8ClampedArray(data.length);
+                    
+                    const kSize = Math.sqrt(kernel.length);
+                    const kRadius = Math.floor(kSize / 2);
+                    
+                    // 应用卷积
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            let r = 0, g = 0, b = 0;
+                            
+                            // 对每个像素应用卷积核
+                            for (let ky = 0; ky < kSize; ky++) {
+                                for (let kx = 0; kx < kSize; kx++) {
+                                    const px = Math.min(width - 1, Math.max(0, x + kx - kRadius));
+                                    const py = Math.min(height - 1, Math.max(0, y + ky - kRadius));
+                                    const i = (py * width + px) * 4;
+                                    const weight = kernel[ky * kSize + kx];
+                                    
+                                    r += data[i] * weight;
+                                    g += data[i + 1] * weight;
+                                    b += data[i + 2] * weight;
+                                }
+                            }
+                            
+                            // 保存结果
+                            const i = (y * width + x) * 4;
+                            result[i] = r;
+                            result[i + 1] = g;
+                            result[i + 2] = b;
+                            result[i + 3] = data[i + 3]; // 保留原始alpha值
+                        }
+                    }
+                    
+                    // 将结果放回画布
+                    destCtx.putImageData(new ImageData(result, width, height), 0, 0);
+                } catch (error) {
+                    console.error('卷积操作出错:', error);
+                    // 如果卷积操作失败，不影响其他处理步骤
+                }
+            }
+            
+            // 应用高斯模糊（用于降噪）- 增强版，添加错误处理
+            function applyGaussianBlur(srcCtx, destCtx, width, height, radius) {
+                try {
+                    // 当半径很小时，直接跳过处理
+                    if (radius <= 0.1) return;
+                    
+                    // 限制最小半径，避免过小值导致的异常
+                    const safeRadius = Math.max(0.1, radius);
+                    
+                    const imageData = srcCtx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    const result = new Uint8ClampedArray(data.length);
+                    
+                    // 创建高斯核
+                    const kernel = createGaussianKernel(safeRadius);
+                    const kSize = kernel.length;
+                    const kRadius = Math.floor(kSize / 2);
+                    
+                    // 水平方向应用模糊
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            let r = 0, g = 0, b = 0, a = 0;
+                            
+                            for (let kx = 0; kx < kSize; kx++) {
+                                const px = Math.min(width - 1, Math.max(0, x + kx - kRadius));
+                                const i = (y * width + px) * 4;
+                                const weight = kernel[kx];
+                                
+                                r += data[i] * weight;
+                                g += data[i + 1] * weight;
+                                b += data[i + 2] * weight;
+                                a += data[i + 3] * weight;
+                            }
+                            
+                            const i = (y * width + x) * 4;
+                            result[i] = Math.min(255, Math.max(0, Math.round(r)));
+                            result[i + 1] = Math.min(255, Math.max(0, Math.round(g)));
+                            result[i + 2] = Math.min(255, Math.max(0, Math.round(b)));
+                            result[i + 3] = Math.min(255, Math.max(0, Math.round(a)));
+                        }
+                    }
+                    
+                    // 垂直方向应用模糊
+                    const temp = new Uint8ClampedArray(result);
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            let r = 0, g = 0, b = 0, a = 0;
+                            
+                            for (let ky = 0; ky < kSize; ky++) {
+                                const py = Math.min(height - 1, Math.max(0, y + ky - kRadius));
+                                const i = (py * width + x) * 4;
+                                const weight = kernel[ky];
+                                
+                                r += temp[i] * weight;
+                                g += temp[i + 1] * weight;
+                                b += temp[i + 2] * weight;
+                                a += temp[i + 3] * weight;
+                            }
+                            
+                            const i = (y * width + x) * 4;
+                            result[i] = Math.min(255, Math.max(0, Math.round(r)));
+                            result[i + 1] = Math.min(255, Math.max(0, Math.round(g)));
+                            result[i + 2] = Math.min(255, Math.max(0, Math.round(b)));
+                            result[i + 3] = Math.min(255, Math.max(0, Math.round(a)));
+                        }
+                    }
+                    
+                    // 将结果放回画布
+                    destCtx.putImageData(new ImageData(result, width, height), 0, 0);
+                } catch (error) {
+                    console.error('高斯模糊处理出错:', error);
+                    // 如果模糊处理失败，不影响其他处理步骤
+                }
+            }
+            
+            // 创建高斯核
+            function createGaussianKernel(radius) {
+                const size = radius * 2 + 1;
+                const sigma = radius / 3;
+                const kernel = new Float32Array(size);
+                let sum = 0;
+                
+                for (let i = 0; i < size; i++) {
+                    const x = i - radius;
+                    kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+                    sum += kernel[i];
+                }
+                
+                // 归一化
+                for (let i = 0; i < size; i++) {
+                    kernel[i] /= sum;
+                }
+                
+                return kernel;
+            }
+            
+            // 初始化图片对比滑块 - 完全修复版
+            function initImageComparison() {
+                console.log('初始化图片对比滑块');
+                
+                const container = document.querySelector('.image-comparison-wrapper');
+                const slider = document.querySelector('.comparison-slider');
+                const afterImageContainer = document.querySelector('.after-image-container');
+                const beforeImg = document.getElementById('before-image');
+                const afterImg = document.getElementById('after-image');
+                
+                // 安全检查
+                if (!slider || !afterImageContainer || !container || !beforeImg || !afterImg) {
+                    console.warn('对比视图元素缺失');
+                    return;
+                }
+                
+                // 确保图片正确加载
+                ensureImagesLoaded();
+                
+                let isDragging = false;
+                let currentX = 50; // 默认位置在中间
+                let currentY = 50;
+                let isVertical = container.classList.contains('vertical');
+                
+                // 重置滑块位置
+                if (isVertical) {
+                    afterImageContainer.style.height = `${currentY}%`;
+                    slider.style.top = `${currentY}%`;
+                } else {
+                    afterImageContainer.style.width = `${currentX}%`;
+                    slider.style.left = `${currentX}%`;
+                }
+                
+                // 更新滑块图标方向
+                function updateSliderIcon() {
+                    const sliderAfter = slider.querySelector('::after');
+                    if (isVertical) {
+                        // 垂直模式使用上下箭头
+                        slider.style.setProperty('--slider-icon', '⟲');
+                    } else {
+                        // 水平模式使用播放按钮
+                        slider.style.setProperty('--slider-icon', '▶');
+                    }
+                }
+                
+                // 鼠标/触摸事件处理函数
+                function moveSlider(e) {
+                    if (!isDragging && e.type !== 'click') return;
+                    
+                    // 防止页面滚动
+                    e.preventDefault();
+                    
+                    const rect = container.getBoundingClientRect();
+                    let x, y;
+                    
+                    if (e.type === 'touchmove' || e.type === 'touchstart') {
+                        x = e.touches[0].clientX - rect.left;
+                        y = e.touches[0].clientY - rect.top;
+                    } else {
+                        x = e.clientX - rect.left;
+                        y = e.clientY - rect.top;
+                    }
+                    
+                    if (isVertical) {
+                        // 垂直模式
+                        const position = (y / rect.height) * 100;
+                        const boundedPosition = Math.max(0, Math.min(100, position));
+                        
+                        // 使用CSS过渡实现平滑动画
+                        afterImageContainer.style.height = `${boundedPosition}%`;
+                        slider.style.top = `${boundedPosition}%`;
+                        
+                        currentY = boundedPosition;
+                    } else {
+                        // 水平模式
+                        const position = (x / rect.width) * 100;
+                        const boundedPosition = Math.max(0, Math.min(100, position));
+                        
+                        // 使用CSS过渡实现平滑动画
+                        afterImageContainer.style.width = `${boundedPosition}%`;
+                        slider.style.left = `${boundedPosition}%`;
+                        
+                        currentX = boundedPosition;
+                    }
+                }
+                
+                // 开始拖动
+                function startDrag(e) {
+                    e.preventDefault();
+                    isDragging = true;
+                    
+                    // 添加拖动中的样式
+                    slider.classList.add('dragging');
+                    container.classList.add('comparison-dragging');
+                }
+                
+                // 结束拖动
+                function endDrag() {
+                    if (isDragging) {
+                        isDragging = false;
+                        
+                        // 移除拖动中的样式
+                        slider.classList.remove('dragging');
+                        container.classList.remove('comparison-dragging');
+                    }
+                }
+                
+                // 清除之前的事件监听器，避免重复绑定
+                slider.removeEventListener('mousedown', startDrag);
+                slider.removeEventListener('touchstart', startDrag);
+                document.removeEventListener('mousemove', moveSlider);
+                document.removeEventListener('touchmove', moveSlider);
+                document.removeEventListener('mouseup', endDrag);
+                document.removeEventListener('touchend', endDrag);
+                document.removeEventListener('mouseleave', endDrag);
+                
+                // 重新绑定事件监听器
+                slider.addEventListener('mousedown', startDrag);
+                slider.addEventListener('touchstart', startDrag, { passive: false });
+                
+                // 移动事件
+                document.addEventListener('mousemove', moveSlider);
+                document.addEventListener('touchmove', moveSlider, { passive: false });
+                
+                // 结束拖动
+                document.addEventListener('mouseup', endDrag);
+                document.addEventListener('touchend', endDrag);
+                document.addEventListener('mouseleave', endDrag);
+                
+                // 更新滑块图标
+                updateSliderIcon();
+                
+                // 添加对比操作提示
+                const tooltip = document.createElement('div');
+                tooltip.className = 'absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-xs z-10';
+                tooltip.textContent = isVertical ? '拖动滑块查看上下对比' : '拖动滑块查看左右对比';
+                container.appendChild(tooltip);
+                
+                // 3秒后自动隐藏提示
+                setTimeout(() => {
+                    tooltip.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                    setTimeout(() => {
+                        if (tooltip.parentNode) {
+                            tooltip.parentNode.removeChild(tooltip);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+            
+            // 确保图片正确加载
+            function ensureImagesLoaded() {
+                const beforeImg = document.getElementById('before-image');
+                const afterImg = document.getElementById('after-image');
+                const resultImg = document.getElementById('result-image');
+                
+                // 确保原图正确显示
+                if (beforeImg && currentImage) {
+                    const originalImageUrl = URL.createObjectURL(currentImage);
+                    if (beforeImg.src !== originalImageUrl) {
+                        beforeImg.src = originalImageUrl;
+                    }
+                }
+                
+                // 确保处理后的图片正确显示
+                if (afterImg && resultImg && resultImg.src) {
+                    if (afterImg.src !== resultImg.src) {
+                        afterImg.src = resultImg.src;
+                    }
+                }
+            }
+            
+            // 下载图片
+            function downloadImage(url, filename) {
+                console.log('下载图片:', filename);
+                
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                
+                // 添加到页面并触发点击
+                document.body.appendChild(link);
+                link.click();
+                
+                // 移除链接
+                document.body.removeChild(link);
+                
+                // 显示下载成功通知
+                showNotification('图片下载成功', 'success');
+            }
+            
+            // 重置界面
+            function resetInterface() {
+                initialState.classList.remove('hidden');
+                processingState.classList.add('hidden');
+                resultState.classList.add('hidden');
+                parametersSection.classList.add('hidden');
+                imagePreviewContainer.classList.add('hidden');
+                selectedImages = [];
+                currentImage = null;
+                totalSize = 0;
+                uploadSizeWarning.classList.add('hidden');
+                
+                // 重置处理按钮状态
+                processBtn.disabled = true;
+                
+                // 重置降噪按钮状态
+                denoiseBtns.forEach(btn => {
+                    if (parseInt(btn.dataset.denoise) === 30) {
+                        btn.classList.add('selected', 'bg-primary', 'text-white');
+                    } else {
+                        btn.classList.remove('selected', 'bg-primary', 'text-white');
+                    }
+                });
+            }
+            
+            // 显示通知
+            function showNotification(message, type = 'info') {
+                console.log('显示通知:', message, type);
+                
+                // 创建通知元素
+                const notification = document.createElement('div');
+                
+                // 设置样式和内容
+                let bgColor, icon;
+                switch (type) {
+                    case 'success':
+                        bgColor = 'bg-green-500';
+                        icon = 'fa-check-circle';
+                        break;
+                    case 'error':
+                        bgColor = 'bg-red-500';
+                        icon = 'fa-exclamation-circle';
+                        break;
+                    case 'warning':
+                        bgColor = 'bg-yellow-500';
+                        icon = 'fa-exclamation-triangle';
+                        break;
+                    default:
+                        bgColor = 'bg-blue-500';
+                        icon = 'fa-info-circle';
+                }
+                
+                notification.className = `fixed top-4 right-4 ${bgColor} text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-x-full opacity-0`;
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa ${icon} mr-2"></i>
+                        <span>${message}</span>
+                    </div>
+                `;
+                
+                // 添加到页面
+                document.body.appendChild(notification);
+                
+                // 显示通知
+                setTimeout(() => {
+                    notification.classList.remove('translate-x-full', 'opacity-0');
+                }, 100);
+                
+                // 自动隐藏
+                setTimeout(() => {
+                    notification.classList.add('translate-x-full', 'opacity-0');
+                    
+                    // 移除元素
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 5000);
+            }
+            
+            console.log('应用初始化完成');
+        });
+    </script>
+</body>
+</html>
